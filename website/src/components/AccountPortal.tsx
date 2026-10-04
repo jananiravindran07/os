@@ -6,6 +6,7 @@ type Role = 'admin' | 'user' | 'guest'
 type Profile = { id: string; username: string; role: Role; status: 'active' | 'locked' }
 type Session = { access_token: string; refresh_token: string; expires_at?: number; user: { id: string; email: string } }
 type Resource = { name: string; required_role: Role | 'public'; description: string }
+type AuditEvent = { action: string; created_at: string }
 
 const env = import.meta.env
 const supabaseUrl = env.VITE_SUPABASE_URL as string | undefined
@@ -51,6 +52,7 @@ export function AccountPortal() {
   const [profile, setProfile] = useState<Profile | null>(null)
   const [resources, setResources] = useState<Resource[]>([])
   const [people, setPeople] = useState<Profile[]>([])
+  const [events, setEvents] = useState<AuditEvent[]>([])
   const [email, setEmail] = useState('')
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
@@ -77,7 +79,13 @@ export function AccountPortal() {
     let cancelled = false
     async function load() {
       try {
-        const rows = await supabase('profiles?select=id,username,role,status&id=eq.' + encodeURIComponent(session.user.id), { token: session.access_token }) as Profile[]
+        if (session.expires_at && session.expires_at < Date.now() / 1000 + 60) {
+          const fresh = await supabase('token?grant_type=refresh_token', { auth: true, body: { refresh_token: session.refresh_token } }) as Session & { expires_in?: number }
+          const renewed = { ...fresh, expires_at: Date.now() / 1000 + (fresh.expires_in ?? 3600) }
+          if (!cancelled) { saveSession(renewed); setSession(renewed) }
+          return
+        }
+        const rows = await supabase('profiles?select=id,username,role,status,failed_attempts&id=eq.' + encodeURIComponent(session.user.id), { token: session.access_token }) as Profile[]
         const own = rows[0]
         if (!own || own.status === 'locked') {
           saveSession(null); setSession(null)
@@ -88,8 +96,10 @@ export function AccountPortal() {
         const visible = await supabase('resources?select=name,required_role,description&order=name.asc', { token: session.access_token }) as Resource[]
         if (!cancelled) setResources(visible)
         await supabase('audit_events', { token: session.access_token, body: { action: 'session_started' } })
+        const recent = await supabase('audit_events?select=action,created_at&order=created_at.desc&limit=8', { token: session.access_token }) as AuditEvent[]
+        if (!cancelled) setEvents(recent)
         if (own.role === 'admin') {
-          const allPeople = await supabase('profiles?select=id,username,role,status&order=username.asc', { token: session.access_token }) as Profile[]
+          const allPeople = await supabase('profiles?select=id,username,role,status,failed_attempts&order=username.asc', { token: session.access_token }) as Profile[]
           if (!cancelled) setPeople(allPeople)
         }
       } catch (reason) {
@@ -132,6 +142,7 @@ export function AccountPortal() {
         const renewed = { ...verified, expires_at: Date.now() / 1000 + (verified.expires_in ?? 3600) }
         await supabase('user', { auth: true, method: 'PUT', token: renewed.access_token, body: { password: newPassword } })
         await supabase('audit_events', { token: renewed.access_token, body: { action: 'password_changed' } })
+        setEvents(await supabase('audit_events?select=action,created_at&order=created_at.desc&limit=8', { token: renewed.access_token }) as AuditEvent[])
         saveSession(renewed); setSession(renewed); setPassword(''); setNewPassword('')
         setMessage('Password changed successfully.')
       }
@@ -143,7 +154,10 @@ export function AccountPortal() {
   async function logout() {
     setBusy(true); setError('')
     try {
-      if (session) await supabase('logout', { auth: true, method: 'POST', token: session.access_token })
+      if (session) {
+        await supabase('audit_events', { token: session.access_token, body: { action: 'logout' } })
+        await supabase('logout', { auth: true, method: 'POST', token: session.access_token })
+      }
     } catch { /* Clear this browser session even if the network is unavailable. */ }
     saveSession(null); setSession(null); setProfile(null); setPeople([]); setMode('login'); setBusy(false)
     setMessage('You are signed out.')
@@ -154,9 +168,10 @@ export function AccountPortal() {
     setError(''); setMessage('')
     try {
       await supabase('profiles?id=eq.' + encodeURIComponent(person.id), { method: 'PATCH', token: session.access_token, body: { status, failed_attempts: status === 'active' ? 0 : 3 } })
-      setPeople(items => items.map(item => item.id === person.id ? { ...item, status } : item))
+      setPeople(items => items.map(item => item.id === person.id ? { ...item, status, failed_attempts: status === 'active' ? 0 : 3 } : item))
       setMessage(person.username + ' is now ' + status + '.')
       await supabase('audit_events', { token: session.access_token, body: { action: 'account_' + status + ':' + person.username } })
+      setEvents(await supabase('audit_events?select=action,created_at&order=created_at.desc&limit=8', { token: session.access_token }) as AuditEvent[])
     } catch (reason) { setError(reason instanceof Error ? reason.message : 'Could not update the account.') }
   }
 
@@ -188,7 +203,9 @@ export function AccountPortal() {
               <div className="account-actions"><button type="button" className="account-button" onClick={() => setView('change')}><KeyRound size={16}/>Change password</button><button type="button" className="account-button secondary" onClick={() => void logout()} disabled={busy}><LogOut size={16}/>Sign out</button></div>
               <h3 className="account-subheading">Resources available to you</h3>
               {resources.length ? <ul className="resource-list">{resources.map(item => <li key={item.name}><strong>{item.name}</strong><span>{item.description}</span><small>{item.required_role} access</small></li>)}</ul> : <p className="account-hint">No resources are available to this role.</p>}
-              {profile.role === 'admin' && <><h3 className="account-subheading">Account access control</h3><div className="people-list">{people.map(person => <div className="person-row" key={person.id}><span><strong>{person.username}</strong><small>{person.role} · {person.status}</small></span><button type="button" className="account-button small" disabled={person.id === profile.id} onClick={() => void setAccountStatus(person, person.status === 'locked' ? 'active' : 'locked')}>{person.status === 'locked' ? 'Unlock' : 'Lock'}</button></div>)}</div></>}
+              <h3 className="account-subheading">Recent security activity</h3>
+              {events.length ? <ul className="resource-list">{events.map((event, index) => <li key={event.created_at + index}><strong>{event.action.replaceAll('_', ' ')}</strong><small>{new Date(event.created_at).toLocaleString()}</small></li>)}</ul> : <p className="account-hint">No recent events.</p>}
+              {profile.role === 'admin' && <><h3 className="account-subheading">Account access control</h3><div className="people-list">{people.map(person => <div className="person-row" key={person.id}><span><strong>{person.username}</strong><small>{person.role} · {person.status} · {person.failed_attempts ?? 0} failed</small></span><button type="button" className="account-button small" disabled={person.id === profile.id} onClick={() => void setAccountStatus(person, person.status === 'locked' ? 'active' : 'locked')}>{person.status === 'locked' ? 'Unlock' : 'Lock'}</button></div>)}</div></>}
             </> : <>
               <div className="account-tabs">{([['login', 'Sign in'], ['register', 'Create account'], ['recover', 'Forgot password']] as const).map(([key, label]) => <button type="button" key={key} aria-pressed={mode === key} onClick={() => setView(key)}>{label}</button>)}</div>
               <form className="account-form" onSubmit={submit}>
