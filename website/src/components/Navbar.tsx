@@ -3,7 +3,7 @@ import { Menu, X } from 'lucide-react'
 import { navigateToSection } from '@/lib/anchor'
 
 const links = [
-  ['Overview', '#overview'], ['Features', '#features'], ['Roles', '#roles'],
+  ['Use features', '#account'], ['Overview', '#overview'], ['Features', '#features'], ['Roles', '#roles'],
   ['Flow', '#flow'], ['Code', '#code'], ['OS Concepts', '#os-concepts'],
 ]
 
