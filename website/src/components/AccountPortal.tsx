@@ -78,15 +78,15 @@ export function AccountPortal() {
     const activeSession = session
     if (!activeSession) { setProfile(null); setResources([]); setPeople([]); return }
     let cancelled = false
-    async function load() {
+    async function load(currentSession: Session) {
       try {
-        if (activeSession.expires_at && activeSession.expires_at < Date.now() / 1000 + 60) {
-          const fresh = await supabase('token?grant_type=refresh_token', { auth: true, body: { refresh_token: activeSession.refresh_token } }) as Session & { expires_in?: number }
+        if (currentSession.expires_at && currentSession.expires_at < Date.now() / 1000 + 60) {
+          const fresh = await supabase('token?grant_type=refresh_token', { auth: true, body: { refresh_token: currentSession.refresh_token } }) as Session & { expires_in?: number }
           const renewed = { ...fresh, expires_at: Date.now() / 1000 + (fresh.expires_in ?? 3600) }
           if (!cancelled) { saveSession(renewed); setSession(renewed) }
           return
         }
-        const rows = await supabase('profiles?select=id,username,role,status,failed_attempts&id=eq.' + encodeURIComponent(activeSession.user.id), { token: activeSession.access_token }) as unknown as Profile[]
+        const rows = await supabase('profiles?select=id,username,role,status,failed_attempts&id=eq.' + encodeURIComponent(currentSession.user.id), { token: currentSession.access_token }) as unknown as Profile[]
         const own = rows[0]
         if (!own || own.status === 'locked') {
           saveSession(null); setSession(null)
@@ -94,20 +94,20 @@ export function AccountPortal() {
         }
         if (cancelled) return
         setProfile(own)
-        const visible = await supabase('resources?select=name,required_role,description&order=name.asc', { token: activeSession.access_token }) as unknown as Resource[]
+        const visible = await supabase('resources?select=name,required_role,description&order=name.asc', { token: currentSession.access_token }) as unknown as Resource[]
         if (!cancelled) setResources(visible)
-        await supabase('audit_events', { token: activeSession.access_token, body: { action: 'session_started' } })
-        const recent = await supabase('audit_events?select=action,created_at&order=created_at.desc&limit=8', { token: activeSession.access_token }) as unknown as AuditEvent[]
+        await supabase('audit_events', { token: currentSession.access_token, body: { action: 'session_started' } })
+        const recent = await supabase('audit_events?select=action,created_at&order=created_at.desc&limit=8', { token: currentSession.access_token }) as unknown as AuditEvent[]
         if (!cancelled) setEvents(recent)
         if (own.role === 'admin') {
-          const allPeople = await supabase('profiles?select=id,username,role,status,failed_attempts&order=username.asc', { token: activeSession.access_token }) as unknown as Profile[]
+          const allPeople = await supabase('profiles?select=id,username,role,status,failed_attempts&order=username.asc', { token: currentSession.access_token }) as unknown as Profile[]
           if (!cancelled) setPeople(allPeople)
         }
       } catch (reason) {
         if (!cancelled) setError(reason instanceof Error ? reason.message : 'Could not load your account.')
       }
     }
-    void load()
+    void load(activeSession)
     return () => { cancelled = true }
   }, [session])
 
