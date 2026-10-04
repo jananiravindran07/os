@@ -20,7 +20,7 @@ async function supabase(path: string, options: { body?: unknown; token?: string;
     method: options.method ?? (options.body ? 'POST' : 'GET'),
     headers: {
       apikey: supabaseAnonKey as string,
-      Authorization: 'Bearer ' + (options.token ?? supabaseAnonKey),
+      ...(options.token ? { Authorization: 'Bearer ' + options.token } : {}),
       'Content-Type': 'application/json',
       Prefer: 'return=representation',
     },
