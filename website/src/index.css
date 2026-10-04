@@ -1,0 +1,95 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+@theme {
+  --color-periwinkle: #837bb9;
+  --color-indigo: #342e57;
+  --color-cream: #fdf4e5;
+  --color-white: #ffffff;
+  --font-display: "Fraunces", Georgia, serif;
+  --font-sans: "Jost", sans-serif;
+  --font-mono: "JetBrains Mono", monospace;
+}
+
+:root {
+  font-family: var(--font-sans);
+  color: #342e57;
+  background: #fdf4e5;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  font-optical-sizing: auto;
+  scroll-behavior: smooth;
+  --periwinkle: #837bb9;
+  --indigo: #342e57;
+  --cream: #fdf4e5;
+  --white: #ffffff;
+  --background: #fdf4e5;
+  --foreground: #342e57;
+  --card: #ffffff;
+  --card-foreground: #342e57;
+  --popover: #ffffff;
+  --popover-foreground: #342e57;
+  --primary: #837bb9;
+  --primary-foreground: #fdf4e5;
+  --secondary: #ffffff;
+  --secondary-foreground: #342e57;
+  --muted: #fdf4e5;
+  --muted-foreground: #342e57;
+  --accent: #837bb9;
+  --accent-foreground: #fdf4e5;
+  --destructive: #342e57;
+  --border: #837bb9;
+  --input: #837bb9;
+  --ring: #837bb9;
+  --radius: 0.625rem;
+}
+
+@theme inline {
+  --font-heading: var(--font-display);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; min-width: 320px; }
+button, a { font: inherit; }
+button:focus-visible, a:focus-visible { outline: 3px solid var(--periwinkle); outline-offset: 4px; }
+html, body, button, a, [role="button"], input, select, textarea { cursor: url("/pixel-cursor.svg") 3 2, auto; }
+::selection { background: var(--indigo); color: var(--cream); }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+}
+
+@media (hover: none), (pointer: coarse) {
+  html, body, button, a, [role="button"], input, select, textarea { cursor: auto; }
+}
+
+@layer base {
+  * { @apply border-border outline-ring/50; }
+  body { @apply bg-background text-foreground; }
+  html { @apply font-sans; }
+}

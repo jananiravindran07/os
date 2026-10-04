@@ -1,0 +1,18 @@
+# Local account data and activity logs
+/users.txt
+/audit.log
+
+# Local build outputs
+*.exe
+*.o
+*.obj
+/website/node_modules/
+/website/dist/
+/website/.vite/
+
+# Editor and OS files
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
