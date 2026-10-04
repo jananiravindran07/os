@@ -1,67 +1,41 @@
-# User Authentication & Access Control — Project Website
+# Online account setup
 
-A responsive project presentation for the Operating Systems mini-project written in C. It explains the project's features, access roles, authentication flow, C modules and OS concepts. The flow animation, role matrix and code explorer are presentation elements; the site does not simulate sign-in or read or modify the C program's `users.txt` and `audit.log` files.
+The website includes an online registration, sign-in, password recovery, role-based resource access and admin lock/unlock panel. It uses Supabase Auth and Postgres. GitHub Pages hosts the interface; Supabase stores accounts and enforces access.
 
-## Run locally
+## One-time setup
 
-```sh
-cd website
-npm install
-npm run dev
+1. Create a Supabase project at https://supabase.com/dashboard.
+2. Open **SQL Editor**, paste in the repository file `supabase/schema.sql`, and run it.
+3. Deploy the login function from a terminal with the Supabase CLI installed:
+   ```sh
+   npx supabase login
+   npx supabase link --project-ref YOUR_PROJECT_REF
+   npx supabase functions deploy login
+   ```
+   The function uses the project secrets Supabase provides to Edge Functions. Never put the service-role key in the website or GitHub.
+4. In **Authentication → URL Configuration**, set the Site URL to `https://jananiravindran07.github.io/os` and add `https://jananiravindran07.github.io/os/*` to the allowed redirect URLs. This is needed for password-reset links.
+5. In the GitHub repository, open **Settings → Secrets and variables → Actions**:
+   - Add repository variable `VITE_SUPABASE_URL` with the Project URL.
+   - Add repository secret `VITE_SUPABASE_ANON_KEY` with the project's publishable/anon key.
+6. Merge the website changes into `main`. The Pages workflow will build with those settings and publish the account section.
+
+For local development, copy `.env.example` to `.env.local` in the `website` folder and fill in the same two values. Never use a service-role key for either value.
+
+## Make an administrator
+
+Register and confirm your own email address through the site. Then run this in the Supabase SQL Editor, replacing the email:
+
+```sql
+update public.profiles
+set role = 'admin'
+where email = lower('you@example.com');
 ```
 
-Vite prints the local preview URL after it starts. Create a production build with `npm run build`.
+Administrators can see the account list and lock or unlock accounts. The Edge Function blocks sign-in after three consecutive bad passwords. Row-level security also prevents a locked account from reading protected resources. Roles are assigned by the database; visitors cannot register themselves as admins.
 
-## Folder structure
+## Notes
 
-```text
-website/
-├── public/
-│   └── pixel-cursor.svg
-├── src/
-│   ├── components/
-│   │   ├── core/text-effect.tsx  # motion-primitives text animation
-│   │   ├── ui/button.tsx         # shadcn/ui button
-│   │   ├── Navbar.tsx            # page navigation
-│   │   ├── Hero.tsx              # animated introduction
-│   │   ├── Overview.tsx          # project goals and summary
-│   │   ├── Features.tsx           # implemented security features
-│   │   ├── Roles.tsx              # permissions and access matrix
-│   │   ├── Flow.tsx               # sign-in and authorization flow
-│   │   ├── CodeStructure.tsx      # selectable C modules and examples
-│   │   ├── OsConcepts.tsx         # OS concepts mapped to modules
-│   │   ├── Footer.tsx
-│   │   ├── SectionHeading.tsx     # in-view heading animation
-│   │   └── RevealText.tsx         # in-view title animation
-│   ├── lib/
-│   │   ├── anchor.ts              # smooth anchor navigation
-│   │   └── utils.ts               # shadcn class helper
-│   ├── App.tsx
-│   ├── App.css
-│   ├── index.css                  # four-color theme tokens and base styles
-│   └── main.tsx
-├── index.html                    # page metadata and Google Fonts
-├── components.json
-├── package.json
-├── package-lock.json
-├── tsconfig.json                  # @/* TypeScript alias
-├── tsconfig.app.json
-└── vite.config.ts
-```
-
-## Website sections
-
-The page is organized as Navbar, Hero, Overview, Features, Roles, Flow, Code Structure, OS Concepts and Footer. The text animations respect the visitor's reduced-motion preference. The interactive code explorer and permission cards explain the actual C project without changing its files.
-
-## How the website maps to the C modules
-
-| Website section | C project files it explains |
-|---|---|
-| Overview | `main.c`, `auth.c`, `access_control.c` |
-| Features | `auth.c`, `password.c`, `session.c`, `admin.c`, `logger.c`, `database.c` |
-| Roles and access matrix | `user.c`, `user.h`, `access_control.c`, `access_control.h` |
-| Authentication flow | `main.c`, `auth.c`, `password.c`, `session.c`, `access_control.c` |
-| Code structure | All modules: `main.c`, `auth.c`, `user.c`, `password.c`, `session.c`, `access_control.c`, `admin.c`, `logger.c`, `database.c`, `utils.c` |
-| OS concepts | `session.c`, `database.c`, `logger.c`, `user.c`, `access_control.c` |
-
-The page's file tree, code samples and file-format examples are explanatory snapshots. The actual C source and data files remain in the parent project folder.
+- Online accounts require an email address. The old `apple` account belongs to the local C program's `users.txt` and is not automatically copied. Register it here with an email address.
+- Password reset links are sent by Supabase Auth. Configure a custom SMTP provider in Supabase before opening registrations broadly; the built-in mail service is for limited testing.
+- The public anon key is designed to be present in the browser. Database security comes from the SQL row-level security policies. Keep the service-role key private.
+- This changes online auth storage from the C program's local `users.txt` to Supabase. The command-line program remains separate.
