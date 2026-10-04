@@ -75,17 +75,18 @@ export function AccountPortal() {
   }, [])
 
   useEffect(() => {
-    if (!session) { setProfile(null); setResources([]); setPeople([]); return }
+    const activeSession = session
+    if (!activeSession) { setProfile(null); setResources([]); setPeople([]); return }
     let cancelled = false
     async function load() {
       try {
-        if (session.expires_at && session.expires_at < Date.now() / 1000 + 60) {
-          const fresh = await supabase('token?grant_type=refresh_token', { auth: true, body: { refresh_token: session.refresh_token } }) as Session & { expires_in?: number }
+        if (activeSession.expires_at && activeSession.expires_at < Date.now() / 1000 + 60) {
+          const fresh = await supabase('token?grant_type=refresh_token', { auth: true, body: { refresh_token: activeSession.refresh_token } }) as Session & { expires_in?: number }
           const renewed = { ...fresh, expires_at: Date.now() / 1000 + (fresh.expires_in ?? 3600) }
           if (!cancelled) { saveSession(renewed); setSession(renewed) }
           return
         }
-        const rows = await supabase('profiles?select=id,username,role,status,failed_attempts&id=eq.' + encodeURIComponent(session.user.id), { token: session.access_token }) as Profile[]
+        const rows = await supabase('profiles?select=id,username,role,status,failed_attempts&id=eq.' + encodeURIComponent(activeSession.user.id), { token: activeSession.access_token }) as unknown as Profile[]
         const own = rows[0]
         if (!own || own.status === 'locked') {
           saveSession(null); setSession(null)
@@ -93,13 +94,13 @@ export function AccountPortal() {
         }
         if (cancelled) return
         setProfile(own)
-        const visible = await supabase('resources?select=name,required_role,description&order=name.asc', { token: session.access_token }) as Resource[]
+        const visible = await supabase('resources?select=name,required_role,description&order=name.asc', { token: activeSession.access_token }) as unknown as Resource[]
         if (!cancelled) setResources(visible)
-        await supabase('audit_events', { token: session.access_token, body: { action: 'session_started' } })
-        const recent = await supabase('audit_events?select=action,created_at&order=created_at.desc&limit=8', { token: session.access_token }) as AuditEvent[]
+        await supabase('audit_events', { token: activeSession.access_token, body: { action: 'session_started' } })
+        const recent = await supabase('audit_events?select=action,created_at&order=created_at.desc&limit=8', { token: activeSession.access_token }) as unknown as AuditEvent[]
         if (!cancelled) setEvents(recent)
         if (own.role === 'admin') {
-          const allPeople = await supabase('profiles?select=id,username,role,status,failed_attempts&order=username.asc', { token: session.access_token }) as Profile[]
+          const allPeople = await supabase('profiles?select=id,username,role,status,failed_attempts&order=username.asc', { token: activeSession.access_token }) as unknown as Profile[]
           if (!cancelled) setPeople(allPeople)
         }
       } catch (reason) {
@@ -142,7 +143,7 @@ export function AccountPortal() {
         const renewed = { ...verified, expires_at: Date.now() / 1000 + (verified.expires_in ?? 3600) }
         await supabase('user', { auth: true, method: 'PUT', token: renewed.access_token, body: { password: newPassword } })
         await supabase('audit_events', { token: renewed.access_token, body: { action: 'password_changed' } })
-        setEvents(await supabase('audit_events?select=action,created_at&order=created_at.desc&limit=8', { token: renewed.access_token }) as AuditEvent[])
+        setEvents(await supabase('audit_events?select=action,created_at&order=created_at.desc&limit=8', { token: renewed.access_token }) as unknown as AuditEvent[])
         saveSession(renewed); setSession(renewed); setPassword(''); setNewPassword('')
         setMessage('Password changed successfully.')
       }
@@ -171,7 +172,7 @@ export function AccountPortal() {
       setPeople(items => items.map(item => item.id === person.id ? { ...item, status, failed_attempts: status === 'active' ? 0 : 3 } : item))
       setMessage(person.username + ' is now ' + status + '.')
       await supabase('audit_events', { token: session.access_token, body: { action: 'account_' + status + ':' + person.username } })
-      setEvents(await supabase('audit_events?select=action,created_at&order=created_at.desc&limit=8', { token: session.access_token }) as AuditEvent[])
+      setEvents(await supabase('audit_events?select=action,created_at&order=created_at.desc&limit=8', { token: session.access_token }) as unknown as AuditEvent[])
     } catch (reason) { setError(reason instanceof Error ? reason.message : 'Could not update the account.') }
   }
 
