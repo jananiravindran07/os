@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { ArrowDown, ArrowUpRight, LockKeyhole, Sparkles } from 'lucide-react'
+import { ArrowDown, ArrowUpRight, LockKeyhole, Sparkles, UserRoundPlus } from 'lucide-react'
 import { TextEffect } from '@/components/core/text-effect'
 import { navigateToSection } from '@/lib/anchor'
 
@@ -67,7 +67,7 @@ export function Hero() {
           <AnimatedText as="p" text="Verify who you are. Decide what you can touch." per="char" delay={1.05} className="hero-subtitle" />
           <div className="hero-actions">
             <a className="button button-light" href="#overview" onClick={event => navigateToSection(event, '#overview')}>Explore the project <ArrowUpRight size={17} /></a>
-            <a className="button button-outline" href="#code" onClick={event => navigateToSection(event, '#code')}>Explore the code <ArrowDown size={16} /></a>
+            <a className="button button-outline" href="#account" onClick={event => navigateToSection(event, '#account')}>Use the features <UserRoundPlus size={16} /></a><a className="button button-outline" href="#code" onClick={event => navigateToSection(event, '#code')}>Explore the code <ArrowDown size={16} /></a>
           </div>
           <div className="tech-pills" aria-label="Technology used">
             {['C', 'GCC', 'CLI', 'File-based storage', 'RBAC'].map((item) => <span key={item}>{item}</span>)}
