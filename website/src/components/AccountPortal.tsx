@@ -128,9 +128,11 @@ export function AccountPortal() {
         setMessage('Password updated. Sign in with your new password.')
       } else if (mode === 'change') {
         assertStrongPassword(newPassword)
-        await supabase('user', { auth: true, method: 'PUT', token: session?.access_token, body: { password: newPassword } })
-        await supabase('audit_events', { token: session?.access_token, body: { action: 'password_changed' } })
-        setPassword(''); setNewPassword(''); setMode('login')
+        const verified = await supabase('login', { fn: true, body: { email: session?.user.email, password } }) as Session & { expires_in?: number }
+        const renewed = { ...verified, expires_at: Date.now() / 1000 + (verified.expires_in ?? 3600) }
+        await supabase('user', { auth: true, method: 'PUT', token: renewed.access_token, body: { password: newPassword } })
+        await supabase('audit_events', { token: renewed.access_token, body: { action: 'password_changed' } })
+        saveSession(renewed); setSession(renewed); setPassword(''); setNewPassword('')
         setMessage('Password changed successfully.')
       }
     } catch (reason) {
@@ -170,7 +172,18 @@ export function AccountPortal() {
         {!configured && <div className="account-alert" role="status">Setup is not complete yet. Add the Supabase project URL and public anon key to the GitHub Actions variables before the site can accept accounts.</div>}
         <div className="account-layout">
           <div className="account-panel">
-            {profile ? <>
+            {profile ? mode === 'change' ? <>
+              <h3 className="account-subheading">Change your password</h3>
+              <form className="account-form" onSubmit={submit}>
+                <label>Current password<input required type="password" autoComplete="current-password" value={password} onChange={event => setPassword(event.target.value)}/></label>
+                <label>New password<input required type="password" autoComplete="new-password" value={newPassword} onChange={event => setNewPassword(event.target.value)}/></label>
+                {meter}
+                {error && <p className="account-alert error" role="alert">{error}</p>}
+                {message && <p className="account-alert success" role="status">{message}</p>}
+                <button className="account-button" type="submit" disabled={busy || !configured}><KeyRound size={17}/>{busy ? 'Please wait…' : 'Save password'}</button>
+                <button type="button" className="account-text-button" onClick={() => setView('login')}>Cancel</button>
+              </form>
+            </> : <>
               <div className="account-welcome"><ShieldCheck size={23}/><div><strong>Welcome, {profile.username}</strong><span>Role: {profile.role} · Account: {profile.status}</span></div></div>
               <div className="account-actions"><button type="button" className="account-button" onClick={() => setView('change')}><KeyRound size={16}/>Change password</button><button type="button" className="account-button secondary" onClick={() => void logout()} disabled={busy}><LogOut size={16}/>Sign out</button></div>
               <h3 className="account-subheading">Resources available to you</h3>
