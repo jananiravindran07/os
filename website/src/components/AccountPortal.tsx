@@ -3,7 +3,7 @@ import { KeyRound, LogIn, LogOut, ShieldCheck, UserPlus } from 'lucide-react'
 import './AccountPortal.css'
 
 type Role = 'admin' | 'user' | 'guest'
-type Profile = { id: string; username: string; role: Role; status: 'active' | 'locked' }
+type Profile = { id: string; username: string; role: Role; status: 'active' | 'locked'; failed_attempts?: number }
 type Session = { access_token: string; refresh_token: string; expires_at?: number; user: { id: string; email: string } }
 type Resource = { name: string; required_role: Role | 'public'; description: string }
 type AuditEvent = { action: string; created_at: string }
