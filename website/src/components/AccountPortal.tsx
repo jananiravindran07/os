@@ -12,9 +12,9 @@ const supabaseAnonKey = env.VITE_SUPABASE_ANON_KEY as string | undefined
 const configured = Boolean(supabaseUrl && supabaseAnonKey)
 const sessionKey = 'uac-supabase-session-v1'
 
-async function supabase(path: string, options: { body?: unknown; token?: string; method?: string; auth?: boolean } = {}) {
+async function supabase(path: string, options: { body?: unknown; token?: string; method?: string; auth?: boolean; fn?: boolean } = {}) {
   if (!configured) throw new Error('The account service is not configured yet. Complete the setup steps in the project README.')
-  const url = (supabaseUrl as string).replace(/\/$/, '') + (options.auth ? '/auth/v1/' : '/rest/v1/') + path
+  const url = (supabaseUrl as string).replace(/\/$/, '') + (options.fn ? '/functions/v1/' : options.auth ? '/auth/v1/' : '/rest/v1/') + path
   const response = await fetch(url, {
     method: options.method ?? (options.body ? 'POST' : 'GET'),
     headers: {
@@ -113,7 +113,7 @@ export function AccountPortal() {
           setMode('login')
         }
       } else if (mode === 'login') {
-        const result = await supabase('token?grant_type=password', { auth: true, body: { email: email.trim(), password } }) as Session & { expires_in?: number }
+        const result = await supabase('login', { fn: true, body: { email: email.trim(), password } }) as Session & { expires_in?: number }
         const next = { ...result, expires_at: Date.now() / 1000 + (result.expires_in ?? 3600) }
         saveSession(next); setSession(next); setMessage('')
       } else if (mode === 'recover') {
@@ -150,7 +150,7 @@ export function AccountPortal() {
     if (!session) return
     setError(''); setMessage('')
     try {
-      await supabase('profiles?id=eq.' + encodeURIComponent(person.id), { method: 'PATCH', token: session.access_token, body: { status } })
+      await supabase('profiles?id=eq.' + encodeURIComponent(person.id), { method: 'PATCH', token: session.access_token, body: { status, failed_attempts: status === 'active' ? 0 : 3 } })
       setPeople(items => items.map(item => item.id === person.id ? { ...item, status } : item))
       setMessage(person.username + ' is now ' + status + '.')
       await supabase('audit_events', { token: session.access_token, body: { action: 'account_' + status + ':' + person.username } })
@@ -174,7 +174,7 @@ export function AccountPortal() {
               <div className="account-actions"><button type="button" className="account-button" onClick={() => setView('change')}><KeyRound size={16}/>Change password</button><button type="button" className="account-button secondary" onClick={() => void logout()} disabled={busy}><LogOut size={16}/>Sign out</button></div>
               <h3 className="account-subheading">Resources available to you</h3>
               {resources.length ? <ul className="resource-list">{resources.map(item => <li key={item.name}><strong>{item.name}</strong><span>{item.description}</span><small>{item.required_role} access</small></li>)}</ul> : <p className="account-hint">No resources are available to this role.</p>}
-              {profile.role === 'admin' && <><h3 className="account-subheading">Account access control</h3><div className="people-list">{people.map(person => <div className="person-row" key={person.id}><span><strong>{person.username}</strong><small>{person.role} · {person.status}</small></span><button type="button" className="account-button small" onClick={() => void setAccountStatus(person, person.status === 'locked' ? 'active' : 'locked')}>{person.status === 'locked' ? 'Unlock' : 'Lock'}</button></div>)}</div></>}
+              {profile.role === 'admin' && <><h3 className="account-subheading">Account access control</h3><div className="people-list">{people.map(person => <div className="person-row" key={person.id}><span><strong>{person.username}</strong><small>{person.role} · {person.status}</small></span><button type="button" className="account-button small" disabled={person.id === profile.id} onClick={() => void setAccountStatus(person, person.status === 'locked' ? 'active' : 'locked')}>{person.status === 'locked' ? 'Unlock' : 'Lock'}</button></div>)}</div></>}
             </> : <>
               <div className="account-tabs">{([['login', 'Sign in'], ['register', 'Create account'], ['recover', 'Forgot password']] as const).map(([key, label]) => <button type="button" key={key} aria-pressed={mode === key} onClick={() => setView(key)}>{label}</button>)}</div>
               <form className="account-form" onSubmit={submit}>
@@ -185,7 +185,7 @@ export function AccountPortal() {
                 {(mode === 'register' || mode === 'change' || mode === 'reset') && meter}
                 {error && <p className="account-alert error" role="alert">{error}</p>}
                 {message && <p className="account-alert success" role="status">{message}</p>}
-                <button className="account-button" type="submit" disabled={busy || !configured}>{mode === 'login' ? <LogIn size={17}/> : <UserPlus size={17}/ >}{busy ? 'Please wait…' : mode === 'login' ? 'Sign in' : mode === 'register' ? 'Create account' : mode === 'recover' ? 'Send reset link' : 'Save password'}</button>
+                <button className="account-button" type="submit" disabled={busy || !configured}>{mode === 'login' ? <LogIn size={17}/> : <UserPlus size={17}/>}{busy ? 'Please wait…' : mode === 'login' ? 'Sign in' : mode === 'register' ? 'Create account' : mode === 'recover' ? 'Send reset link' : 'Save password'}</button>
                 {mode === 'change' && <button type="button" className="account-text-button" onClick={() => setView('login')}>Cancel password change</button>}
               </form>
             </>}
