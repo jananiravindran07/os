@@ -1,5 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { KeyRound, LogIn, LogOut, ShieldCheck, UserPlus } from 'lucide-react'
+import './AccountPortal.css'
 
 type Role = 'admin' | 'user' | 'guest'
 type Profile = { id: string; username: string; role: Role; status: 'active' | 'locked' }
