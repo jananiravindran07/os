@@ -18,6 +18,7 @@ The website includes an online registration, sign-in, password recovery, role-ba
    - Add repository variable `VITE_SUPABASE_URL` with the Project URL.
    - Add repository secret `VITE_SUPABASE_ANON_KEY` with the project's publishable/anon key.
 6. Merge the website changes into `main`. The Pages workflow will build with those settings and publish the account section.
+7. If you later change either Actions value, start a fresh run from **Actions → Build and deploy website → Run workflow**; saving a secret alone does not start a new Pages build.
 
 For local development, copy `.env.example` to `.env.local` in the `website` folder and fill in the same two values. Never use a service-role key for either value.
 
