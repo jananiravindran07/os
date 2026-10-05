@@ -54,16 +54,23 @@ create trigger on_auth_user_created_profile
 after insert on auth.users
 for each row execute procedure public.create_profile_for_new_auth_user();
 
+create or replace function public.has_mfa_verified()
+returns boolean
+language sql stable
+as $
+  select coalesce(auth.jwt()->>'aal' = 'aal2', false);
+$;
+
 alter table public.profiles enable row level security;
 drop policy if exists "profiles readable by owner or admin" on public.profiles;
 create policy "profiles readable by owner or admin"
 on public.profiles for select to authenticated
-using (id = auth.uid() or public.is_site_admin());
+using (public.has_mfa_verified() and (id = auth.uid() or public.is_site_admin()));
 drop policy if exists "admins manage profiles" on public.profiles;
 create policy "admins manage profiles"
 on public.profiles for update to authenticated
-using (public.is_site_admin())
-with check (public.is_site_admin());
+using (public.has_mfa_verified() and public.is_site_admin())
+with check (public.has_mfa_verified() and public.is_site_admin());
 
 create table if not exists public.resources (
   id bigint generated always as identity primary key,
@@ -86,6 +93,7 @@ using (
   required_role = 'public'
   or (
     auth.role() = 'authenticated'
+    and public.has_mfa_verified()
     and case required_role
       when 'guest' then public.current_profile_role() in ('guest', 'admin')
       when 'user' then public.current_profile_role() in ('user', 'admin')
@@ -105,11 +113,11 @@ alter table public.audit_events enable row level security;
 drop policy if exists "users read their events and admins read all" on public.audit_events;
 create policy "users read their events and admins read all"
 on public.audit_events for select to authenticated
-using (user_id = auth.uid() or public.is_site_admin());
+using (public.has_mfa_verified() and (user_id = auth.uid() or public.is_site_admin()));
 drop policy if exists "users record their own events" on public.audit_events;
 create policy "users record their own events"
 on public.audit_events for insert to authenticated
-with check (user_id = auth.uid());
+with check (public.has_mfa_verified() and user_id = auth.uid());
 
 -- After creating your own account, promote it from the SQL Editor:
 -- update public.profiles set role = 'admin' where email = 'YOUR_EMAIL';
