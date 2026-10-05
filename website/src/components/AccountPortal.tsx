@@ -355,7 +355,7 @@ export function AccountPortal() {
                 {error && <p className="account-alert error" role="alert">{error}</p>}
                 {message && <p className="account-alert success" role="status">{message}</p>}
                 {mode === 'login' && error && <button type="button" className="account-text-button" onClick={() => setView('recover')}>Forgot your password?</button>}
-                <button className="account-button" type="submit" disabled={busy || !configured}>{mode === 'login' ? <LogIn size={17}/> : <UserPlus size={17}/ >}{busy ? 'Please wait…' : mode === 'login' ? 'Sign in' : mode === 'register' ? 'Create account' : mode === 'recover' ? 'Send reset link' : 'Save password'}</button>
+                <button className="account-button" type="submit" disabled={busy || !configured}>{mode === 'login' ? <LogIn size={17}/> : <UserPlus size={17}/>}{busy ? 'Please wait…' : mode === 'login' ? 'Sign in' : mode === 'register' ? 'Create account' : mode === 'recover' ? 'Send reset link' : 'Save password'}</button>
               </form>
             </>}
           </div>
