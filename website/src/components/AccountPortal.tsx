@@ -2,7 +2,7 @@ import { useEffect, useState, type FormEvent } from 'react'
 import { FirebaseError } from 'firebase/app'
 import { EmailAuthProvider, createUserWithEmailAndPassword, onAuthStateChanged, reauthenticateWithCredential, sendEmailVerification, sendPasswordResetEmail, signInWithEmailAndPassword, signOut, updatePassword, updateProfile, type Auth, type User } from 'firebase/auth'
 import { addDoc, collection, doc, getDoc, getDocs, query, serverTimestamp, setDoc, updateDoc, where, type Firestore, type Timestamp } from 'firebase/firestore'
-import { KeyRound, LogIn, LogOut, ShieldCheck, UserPlus } from 'lucide-react'
+import { Eye, EyeOff, KeyRound, LogIn, LogOut, ShieldCheck, UserPlus } from 'lucide-react'
 import { firebaseAuth, firebaseConfigured, firestore } from '@/lib/firebase'
 import './AccountPortal.css'
 
@@ -27,6 +27,11 @@ function assertStrongPassword(value: string) {
   if (passwordStrength(value) < 3) throw new Error('Use at least 10 characters and include uppercase, lowercase, a number, and a symbol.')
 }
 
+function profileUsername(user: User) {
+  const candidate = (user.displayName || user.email?.split('@')[0] || '').replace(/[^A-Za-z0-9_.-]/g, '_').slice(0, 32)
+  return candidate.length >= 3 ? candidate : 'user_' + user.uid.slice(0, 8)
+}
+
 function errorMessage(reason: unknown) {
   if (reason instanceof FirebaseError) {
     if (reason.code === 'auth/invalid-credential' || reason.code === 'auth/wrong-password' || reason.code === 'auth/user-not-found') return 'Email or password is incorrect.'
@@ -34,9 +39,14 @@ function errorMessage(reason: unknown) {
     if (reason.code === 'auth/weak-password') return 'Choose a stronger password.'
     if (reason.code === 'auth/too-many-requests') return 'Too many attempts. Try again later.'
     if (reason.code === 'auth/unauthorized-continue-uri') return 'Add this website domain to Firebase Authentication authorized domains.'
-    if (reason.code === 'permission-denied') return 'Firebase rejected this request. Check that the Firestore security rules are deployed.'
+    if (reason.code === 'permission-denied') return 'Firestore denied access. Publish firestore.rules in the same Firebase project under Firestore Database → Rules.'
   }
   return reason instanceof Error ? reason.message : 'Something went wrong. Please try again.'
+}
+
+function PasswordField({ label, value, onChange, autoComplete }: { label: string; value: string; onChange: (value: string) => void; autoComplete: string }) {
+  const [visible, setVisible] = useState(false)
+  return <label>{label}<span className="password-input-wrap"><input required type={visible ? 'text' : 'password'} autoComplete={autoComplete} value={value} onChange={event => onChange(event.target.value)}/><button type="button" className="password-visibility" aria-label={visible ? 'Hide password' : 'Show password'} aria-pressed={visible} onClick={() => setVisible(show => !show)}>{visible ? <EyeOff size={17}/> : <Eye size={17}/>}</button></span></label>
 }
 
 async function recordEvent(userId: string, action: string) {
@@ -73,9 +83,16 @@ export function AccountPortal() {
   useEffect(() => {
     if (!firebaseAuth) return
     return onAuthStateChanged(firebaseAuth, user => {
-      setSession(user)
+      const verifiedUser = user?.emailVerified ? user : null
+      setSession(verifiedUser)
       setAuthReady(true)
-      setProfileLoading(Boolean(user) && mode !== 'register')
+      setProfileLoading(Boolean(verifiedUser) && mode !== 'register')
+      if (!verifiedUser) {
+        setProfile(null)
+        setResources([])
+        setPeople([])
+        setEvents([])
+      }
     })
   }, [mode])
 
@@ -88,7 +105,14 @@ export function AccountPortal() {
     let cancelled = false
     async function loadAccount(currentUser: User, databaseClient: Firestore, authClient: Auth) {
       try {
-        const snapshot = await getDoc(doc(databaseClient, 'profiles', currentUser.uid))
+        const profileRef = doc(databaseClient, 'profiles', currentUser.uid)
+        let snapshot = await getDoc(profileRef)
+        if (!snapshot.exists()) {
+          await setDoc(profileRef, {
+            email: currentUser.email ?? '', username: profileUsername(currentUser), role: 'user', status: 'active', created_at: serverTimestamp(),
+          })
+          snapshot = await getDoc(profileRef)
+        }
         if (!snapshot.exists()) throw new Error('Your account profile is missing. Sign out, then create your account again or contact the administrator.')
         const data = snapshot.data()
         const own: Profile = {
@@ -103,13 +127,14 @@ export function AccountPortal() {
           await signOut(authClient)
           return
         }
-        const ownEvents = await loadEvents(currentUser.uid)
-        const allPeople = own.role === 'admin'
-          ? (await getDocs(collection(databaseClient, 'profiles'))).docs.map(item => ({ id: item.id, ...item.data() } as Profile))
-          : []
         if (cancelled) return
         setProfile(own)
         setResources(resourceCatalog.filter(item => item.required_role === 'public' || item.required_role === own.role || own.role === 'admin'))
+        const allPeople = own.role === 'admin'
+          ? (await getDocs(collection(databaseClient, 'profiles'))).docs.map(item => ({ id: item.id, ...item.data() } as Profile))
+          : []
+        const ownEvents = await loadEvents(currentUser.uid)
+        if (cancelled) return
         setEvents(ownEvents)
         setPeople(allPeople)
         await recordEvent(currentUser.uid, 'session_started')
@@ -131,14 +156,14 @@ export function AccountPortal() {
         assertStrongPassword(password)
         if (!/^[A-Za-z0-9_.-]{3,32}$/.test(username.trim())) throw new Error('Use 3–32 letters, numbers, dots, underscores or hyphens for the username.')
         const credential = await createUserWithEmailAndPassword(firebaseAuth, email.trim(), password)
+        await sendEmailVerification(credential.user)
+        setMessage('Verification email sent. Confirm your email address before signing in.')
         await updateProfile(credential.user, { displayName: username.trim() })
         const profileRef = doc(firestore, 'profiles', credential.user.uid)
         const existing = await getDoc(profileRef)
         if (!existing.exists()) await setDoc(profileRef, {
           email: credential.user.email ?? email.trim(), username: username.trim(), role, status: 'active', created_at: serverTimestamp(),
         })
-        await sendEmailVerification(credential.user)
-        setMessage('Verification email sent. Confirm your email address before signing in.')
         await signOut(firebaseAuth)
         setMode('login'); setPassword('')
       } else if (mode === 'login') {
@@ -166,6 +191,7 @@ export function AccountPortal() {
         setPassword(''); setNewPassword(''); setMessage('Password changed successfully.')
       }
     } catch (reason) {
+      if (mode === 'register' && firebaseAuth?.currentUser) await signOut(firebaseAuth)
       setError(errorMessage(reason))
     } finally { setBusy(false) }
   }
@@ -207,8 +233,8 @@ export function AccountPortal() {
             {(!authReady || profileLoading) ? <p className="account-hint">Loading account…</p> : profile ? mode === 'change' ? <>
               <h3 className="account-subheading">Change your password</h3>
               <form className="account-form" onSubmit={submit}>
-                <label>Current password<input required type="password" autoComplete="current-password" value={password} onChange={event => setPassword(event.target.value)}/></label>
-                <label>New password<input required type="password" autoComplete="new-password" value={newPassword} onChange={event => setNewPassword(event.target.value)}/></label>
+                <PasswordField label="Current password" autoComplete="current-password" value={password} onChange={setPassword}/>
+                <PasswordField label="New password" autoComplete="new-password" value={newPassword} onChange={setNewPassword}/>
                 {meter}
                 {error && <p className="account-alert error" role="alert">{error}</p>}
                 {message && <p className="account-alert success" role="status">{message}</p>}
@@ -233,8 +259,8 @@ export function AccountPortal() {
               <form className="account-form" onSubmit={submit}>
                 <label>Email<input required type="email" autoComplete="email" value={email} onChange={event => setEmail(event.target.value)}/></label>
                 {mode === 'register' && <><label>Username<input required minLength={3} maxLength={32} pattern="[A-Za-z0-9_.-]+" title="Use letters, numbers, dots, underscores, or hyphens." autoComplete="username" value={username} onChange={event => setUsername(event.target.value)}/></label><label>Role<select value={role} onChange={event => setRole(event.target.value as 'user'|'guest')}><option value="user">User</option><option value="guest">Guest</option></select></label></>}
-                {(mode === 'login' || mode === 'register') && <label>Password<input required type="password" autoComplete={mode === 'login' ? 'current-password' : 'new-password'} value={password} onChange={event => setPassword(event.target.value)}/></label>}
-                {mode === 'change' && <label>New password<input required type="password" autoComplete="new-password" value={newPassword} onChange={event => setNewPassword(event.target.value)}/></label>}
+                {(mode === 'login' || mode === 'register') && <PasswordField label="Password" autoComplete={mode === 'login' ? 'current-password' : 'new-password'} value={password} onChange={setPassword}/>}
+                {mode === 'change' && <PasswordField label="New password" autoComplete="new-password" value={newPassword} onChange={setNewPassword}/>}
                 {(mode === 'register' || mode === 'change') && meter}
                 {error && <p className="account-alert error" role="alert">{error}</p>}
                 {message && <p className="account-alert success" role="status">{message}</p>}
@@ -242,7 +268,7 @@ export function AccountPortal() {
               </form>
             </>}
           </div>
-          <aside className="account-side"><strong>How this works</strong><p>Firebase Authentication verifies email accounts and handles passwords. Forgot password sends a reset link directly to the address entered.</p><p>Firestore security rules protect profiles and activity. An administrator can lock or unlock accounts here after their role is assigned in Firebase Console.</p><p className="account-hint">Your old “apple” account was in the local C program. Register it here with an email address.</p></aside>
+          <aside className="account-side"><strong>How this works</strong><p>Firebase Authentication verifies email accounts and handles passwords. Forgot password sends a reset link directly to the address entered.</p><p>Firestore security rules protect profiles and activity. An administrator can lock or unlock accounts here after their role is assigned in Firebase Console.</p></aside>
         </div>
       </div>
     </section>
