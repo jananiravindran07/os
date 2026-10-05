@@ -144,8 +144,11 @@ export function AccountPortal() {
       } else if (mode === 'login') {
         const credential = await signInWithEmailAndPassword(firebaseAuth, email.trim(), password)
         if (!credential.user.emailVerified) {
+          await sendEmailVerification(credential.user)
           await signOut(firebaseAuth)
-          throw new Error('Verify your email using the link we sent before signing in.')
+          setPassword('')
+          setMessage('Your email is not verified yet. We sent another verification email; check your inbox and spam folder.')
+          return
         }
         setPassword('')
       } else if (mode === 'recover') {
