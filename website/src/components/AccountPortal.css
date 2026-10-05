@@ -13,6 +13,12 @@
 .account-tabs button[aria-pressed="true"] { border-color: var(--periwinkle); color: var(--periwinkle); }
 .account-form { display: grid; gap: 15px; }
 .account-form label { display: grid; gap: 7px; color: var(--indigo); font-size: 13px; font-weight: 600; }
+.password-input-wrap { position: relative; display: flex; align-items: center; }
+.account-form .password-input-wrap input { padding-right: 48px; }
+.password-visibility { position: absolute; right: 9px; display: grid; place-items: center; width: 34px; height: 34px; border: 0; border-radius: 8px; background: transparent; color: var(--periwinkle); cursor: pointer; }
+.password-visibility:hover { background: rgba(131,123,185,.12); }
+.mfa-qr { display: block; width: min(220px, 100%); height: auto; margin: 14px auto; border: 1px solid rgba(52,46,87,.18); border-radius: 12px; background: white; }
+.mfa-secret { display: block; margin: 8px 0 16px; overflow-wrap: anywhere; border-radius: 9px; padding: 11px; background: var(--cream); color: var(--indigo); font: 500 13px var(--mono); }
 .account-form input,.account-form select { width: 100%; box-sizing: border-box; min-height: 45px; border: 1px solid rgba(52,46,87,.25); border-radius: 11px; padding: 10px 12px; background: #fffaf1; color: var(--indigo); font: 400 14px var(--body); }
 .account-form input:focus,.account-form select:focus { outline: 3px solid rgba(131,123,185,.28); border-color: var(--periwinkle); }
 .account-button { display: inline-flex; min-height: 43px; align-items: center; justify-content: center; gap: 8px; width: fit-content; border: 1px solid var(--indigo); border-radius: 999px; padding: 9px 16px; background: var(--indigo); color: var(--cream); font: 600 13px var(--body); cursor: pointer; transition: transform .18s, opacity .18s; }
