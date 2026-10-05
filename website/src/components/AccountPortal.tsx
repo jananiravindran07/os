@@ -283,7 +283,7 @@ export function AccountPortal() {
   const setView = (next: Mode) => { setMode(next); setError(''); setMessage(''); setPassword(''); setNewPassword('') }
   const cancelMfa = () => { setPendingSession(null); setMfaFactorId(''); setMfaChallengeId(''); setMfaCode(''); setMfaQrCode(''); setMfaSecret(''); setMode('login'); setError(''); setMessage('Sign in again when you are ready to continue.') }
   const meter = <small className="account-hint">Password strength: {['too weak', 'weak', 'fair', 'good', 'strong'][passwordStrength(mode === 'change' || mode === 'reset' ? newPassword : password)]}. Use 10+ characters with mixed case, a number and a symbol.</small>
-  const qrImage = mfaQrCode ? 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(mfaQrCode) : ''
+  const qrImage = mfaQrCode ? (mfaQrCode.startsWith('data:') ? mfaQrCode : 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(mfaQrCode)) : ''
 
   return (
     <section id="account" className="content-section account-section">
