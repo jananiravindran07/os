@@ -37,8 +37,10 @@ jobs:
       - name: Build website
         working-directory: website
         env:
-          VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
-          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          VITE_FIREBASE_API_KEY: ${{ vars.VITEFIREBASEAPIKEY }}
+          VITE_FIREBASE_AUTH_DOMAIN: ${{ vars.VITEFIREBASEAUTHDOMAIN }}
+          VITE_FIREBASE_PROJECT_ID: ${{ vars.VITEFIREBASEPROJECTID }}
+          VITE_FIREBASE_APP_ID: ${{ vars.VITEFIREBASEAPPID }}
         run: npm run build
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3

@@ -1,0 +1,45 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function activeProfile() {
+      return signedIn()
+        && request.auth.token.email_verified == true
+        && get(/databases/$(database)/documents/profiles/$(request.auth.uid)).data.status == 'active';
+    }
+
+    function siteAdmin() {
+      return activeProfile()
+        && get(/databases/$(database)/documents/profiles/$(request.auth.uid)).data.role == 'admin';
+    }
+
+    match /profiles/{userId} {
+      allow create: if signedIn()
+        && request.auth.uid == userId
+        && request.resource.data.email == request.auth.token.email
+        && request.resource.data.username is string
+        && request.resource.data.username.matches('^[A-Za-z0-9_.-]{3,32}$')
+        && request.resource.data.role in ['user', 'guest']
+        && request.resource.data.status == 'active';
+      allow get: if signedIn() && (request.auth.uid == userId || siteAdmin());
+      allow list: if siteAdmin();
+      allow update: if siteAdmin()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status'])
+        && request.resource.data.status in ['active', 'locked'];
+      allow delete: if false;
+    }
+
+    match /audit_events/{eventId} {
+      allow create: if activeProfile()
+        && request.resource.data.user_id == request.auth.uid
+        && request.resource.data.action is string
+        && request.resource.data.created_at == request.time;
+      allow read: if activeProfile()
+        && (resource.data.user_id == request.auth.uid || siteAdmin());
+      allow update, delete: if false;
+    }
+  }
+}

@@ -1,42 +1,26 @@
 # Online account setup
 
-The website includes an online registration, sign-in, password recovery, role-based resource access and admin lock/unlock panel. It uses Supabase Auth and Postgres. GitHub Pages hosts the interface; Supabase stores accounts and enforces access.
+The website uses Firebase Authentication for verified email/password accounts and password-reset emails. Firestore stores account profiles and security activity; `firestore.rules` protects that data. GitHub Pages hosts the website.
 
 ## One-time setup
 
-1. Create a Supabase project at https://supabase.com/dashboard.
-2. Open **SQL Editor**, paste in the repository file `supabase/schema.sql`, and run it.
-3. Deploy the login function from a terminal with the Supabase CLI installed:
-   ```sh
-   npx supabase login
-   npx supabase link --project-ref YOUR_PROJECT_REF
-   npx supabase functions deploy login
-   ```
-   The function uses the project secrets Supabase provides to Edge Functions. Never put the service-role key in the website or GitHub.
-4. In **Authentication → URL Configuration**, set the Site URL to `https://jananiravindran07.github.io/os` and add `https://jananiravindran07.github.io/os/*` to the allowed redirect URLs. This is needed for password-reset links.
-5. In the GitHub repository, open **Settings → Secrets and variables → Actions**:
-   - Add repository variable `VITE_SUPABASE_URL` with the Project URL.
-   - Add repository secret `VITE_SUPABASE_ANON_KEY` with the project's publishable/anon key.
-6. Merge the website changes into `main`. The Pages workflow will build with those settings and publish the account section.
-7. If you later change either Actions value, start a fresh run from **Actions → Build and deploy website → Run workflow**; saving a secret alone does not start a new Pages build.
+1. Create a Firebase project at https://console.firebase.google.com/ and register a Web app.
+2. In **Authentication → Sign-in method**, enable **Email/Password**.
+3. In **Authentication → Settings → Authorized domains**, add the domain that hosts the site (for example, `jananiravindran07.github.io`).
+4. In **Authentication → Templates**, set the password-reset action URL/continue URL to your deployed website. Firebase sends verification and password-reset emails; customize the sender/template there as needed.
+5. Create a Firestore database, then publish the repository's `firestore.rules` in **Firestore Database → Rules**.
+6. In **Project settings → General → Your apps**, copy the web app values into the GitHub repository's **Settings → Secrets and variables → Actions → Variables**:
+    - `VITEFIREBASEAPIKEY` = `apiKey`
+    - `VITEFIREBASEAUTHDOMAIN` = `authDomain`
+    - `VITEFIREBASEPROJECTID` = `projectId`
+    - `VITEFIREBASEAPPID` = `appId`
+7. For local development, copy `.env.example` to `.env.local` in the `website` folder and fill in those same values.
+8. Deploy the website. Create an account, verify the email from the inbox, then sign in. Use **Forgot password** to send a reset email to the entered address.
 
-For local development, copy `.env.example` to `.env.local` in the `website` folder and fill in the same two values. Never use a service-role key for either value.
+Firebase web configuration is public browser configuration, not a secret. Firestore access is controlled by the published security rules; never loosen those rules to public read/write.
 
-## Make an administrator
+## Administrator access
 
-Register and confirm your own email address through the site. Then run this in the Supabase SQL Editor, replacing the email:
+New accounts can choose the `user` or `guest` role. To promote your own account, find its document under Firestore `profiles/{Firebase Auth UID}` and change `role` to `admin`. Administrators can then lock or unlock other account profiles from the website. A locked profile is denied access to the protected profile and activity data by the Firestore rules.
 
-```sql
-update public.profiles
-set role = 'admin'
-where email = lower('you@example.com');
-```
-
-Administrators can see the account list and lock or unlock accounts. The Edge Function blocks sign-in after three consecutive bad passwords. Row-level security also prevents a locked account from reading protected resources. Roles are assigned by the database; visitors cannot register themselves as admins.
-
-## Notes
-
-- Online accounts require an email address. The old `apple` account belongs to the local C program's `users.txt` and is not automatically copied. Register it here with an email address.
-- Password reset links are sent by Supabase Auth. Configure a custom SMTP provider in Supabase before opening registrations broadly; the built-in mail service is for limited testing.
-- The public anon key is designed to be present in the browser. Database security comes from the SQL row-level security policies. Keep the service-role key private.
-- This changes online auth storage from the C program's local `users.txt` to Supabase. The command-line program remains separate.
+Online accounts are separate from the C program's local `users.txt`. Existing local accounts need to register with an email address.
